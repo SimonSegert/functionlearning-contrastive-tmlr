@@ -177,10 +177,10 @@ for task_id in range(10):
             h_comp=h_comp.cpu()
             h_mix=get_reps(model,ys_mix,hparams,autoreg)
             h_mix=h_mix.cpu()
-        print(h_obs.shape)
+
 
         for n_train_samples in train_sample_range:
-            print(n_train_samples)
+
             #n_train_samples refers to average number of samples per kenel, so multiply by number of kernels
             tr_ids=np.arange(n_train_samples*14)
             val_ids=np.arange(n_train_samples*14,(n_train_samples+n_eval_samples)*14)
@@ -330,7 +330,7 @@ for task_id in range(10):
 
 
             ext_targets_val=ys_rsc[val_ids,n_obs:]
-            print('x')
+
             true_cl=np.zeros((len(val_ids),14))
             for i in range(len(val_ids)):
                 true_cl[i,labs[val_ids][i]]=1
