@@ -34,7 +34,7 @@ from copy import deepcopy
 
 
 #load in the saved models
-models_dir='saved_models_may3'
+models_dir='saved_models'
 models=[]
 auto_regs=[]
 model_hparams=[]
