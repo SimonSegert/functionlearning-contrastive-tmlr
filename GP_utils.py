@@ -74,87 +74,14 @@ class Kernel():
         return mu, sigma
 
 
-    def cov_grad(self,x,y):
-        #derivative of the covariance matrix with respect to the hyperparameters
-        #with the keys being the names of the parameters
 
-        #each entry wil be of the form [k,n,n] where k is the dimension of the hparam
-        #and n is the size of the covariance matrix
-
-        #if the kernel is compositional, then the keys will look like K1: (param naame), K2: (param name) etc.
-        raise NotImplementedError
     def llh(self,x_obs, y_obs,inv_reg=0):
         #the log-likelihood of the observations
         C=self.cov(x_obs,x_obs)+inv_reg*np.eye(len(x_obs))
         return -.5*np.sum(y_obs*np.dot(np.linalg.inv(C),y_obs))-.5*np.linalg.slogdet(C)[1]-.5*len(x_obs)*np.log(2*np.pi)
-    def llh_grad(self,x_obs,y_obs,inv_reg=0):
-        #the derivative of the log likelihood with respect to the parameters
-        C=self.cov(x_obs,x_obs)+inv_reg*np.eye(len(x_obs))
-        Cinv=np.linalg.inv(C)
-        grads=dict({})
-        cov_grads=self.cov_grad(x_obs,x_obs)
-        for k,dC in cov_grads.items():
-            #each dC is of the form [k,n,n]
-            dC_inv=-np.einsum('ij,kjl,lm->kim',Cinv,dC,Cinv,optimize='optimal')#-np.dot(Cinv,np.dot(dC,Cinv))
 
-            dlogdet=np.einsum('kij,ji->k',dC,Cinv,optimize='optimal')#np.sum(np.diag(np.dot(Cinv,dC))) #TR(AB)=\sum_{i,j}A_{ij}B_{ji}
-            grads[k]=-.5*np.einsum('j,ijk,k->i',y_obs,dC_inv,y_obs,optimize='optimal')-.5*dlogdet
-            #-.5*np.sum(y_obs*np.dot(dC_inv,y_obs))-.5*dlogdet
 
-        return grads
-    def llh_proj_grad(self,x_obs,y_obs,inv_reg=0,w=None):
-        #the grad log likelihood of a linear projection of the observed data, given by the vector w
-        C=self.cov(x_obs,x_obs)+inv_reg*np.eye(len(x_obs))
-        sigma_sq = np.sum(w*np.dot(C,w) )            #the variance of the projected distribution
-        grad_C=self.cov_grad(x_obs,x_obs)
-        grads=dict({})
-        for k,dC in grad_C.items():
-            sigma_sq_grad=np.einsum('j,ijk,k->i',w,dC, w) #the gradient of the variance wrt this parameter
-            grads[k]=.5*sigma_sq_grad*np.sum(y_obs*w)**2/(sigma_sq)**2-.5*sigma_sq_grad/sigma_sq
-        return grads
-
-    def fit_to_obs(self,x_obs,y_obs,inv_reg=0,n_steps=100,lr=.01,return_vals=False,batch_size=20,grad_clip=10,use_projections=True):
-        #maximize the likelihood of the given observations using gradient ascent
-        #updates the parameters of the kernel in place
-        #batch_size: number of observations to consider at a time when computing the gradient
-        #(not really jusified theoreticially, since P(x_i) is not equal to the average of P(x_I) for all subsets I of a fixed size, but might work anyway)
-        #if use_projections, then will compute gradients using random linear projections of the data instead of picking indices
-        vals=[]
-        for _ in range(n_steps):
-            ids=np.random.choice(len(x_obs),batch_size,replace=False)
-            if return_vals:
-                vals.append(self.llh(x_obs,y_obs,inv_reg=inv_reg))
-            if use_projections:
-                w=np.random.randn(batch_size)
-                w=w/np.sum(w**2)**.5
-                grads=self.llh_proj_grad(x_obs[ids],y_obs[ids],inv_reg=inv_reg,w=w)
-            else:
-                grads=self.llh_grad(x_obs[ids],y_obs[ids],inv_reg=inv_reg)
-            for k,g in grads.items():
-                #each key will be either be the name of a parameter, or else look like K1:K2: name
-                #also, the name of the parameter may have a _log in front
-                splitted=k.split(':')
-                K_to_update=self
-                for n in splitted:
-                    if n in ['K1','K2']:
-                        K_to_update=K_to_update.__getattribute__(n)
-                    else:
-                        #then we have reached the name of the parameters itself
-                        has_log='_log ' in n
-                        param_name=n.split('_log ')[1] if has_log else n
-                        #control the size of the gradients
-                        if np.sum(g**2)<grad_clip**2:
-                            clipped=g
-                        else:
-                            clipped=grad_clip*g/np.sum(g**2)**.5
-                        old_val=K_to_update.__getattribute__(param_name)
-                        if has_log:
-                            K_to_update.__setattr__(param_name, old_val *np.exp(lr * clipped).squeeze())
-                        else:
-                            K_to_update.__setattr__(param_name,old_val+lr*clipped.squeeze())
-        if return_vals:
-            return vals
-
+   
 
 
 class WhiteNoiseKernel(Kernel):
@@ -173,14 +100,7 @@ class SumKernel(Kernel):
         self.name=K1.name+'+'+K2.name
     def cov(self,x,y):
         return self.K1.cov(x,y)+self.K2.cov(x,y)
-    def cov_grad(self,x,y):
-        #return a different format than in the atomic case; this way we know which parameters are from k1 and which from K2
-        g=dict({})
-        for k,v in self.K1.cov_grad(x,y).items():
-            g['K1:'+k]=v
-        for k,v in self.K2.cov_grad(x,y).items():
-            g['K2:'+k]=v
-        return g
+
 
 
 
@@ -192,16 +112,6 @@ class ProductKernel(Kernel):
         self.name=K1.name+'*'+K2.name
     def cov(self,x,y):
         return self.K1.cov(x,y)*self.K2.cov(x,y)
-    def cov_grad(self,x,y):
-        #return a different format than in the atomic case; this way we know which parameters are from k1 and which from K2
-        C1=self.K1.cov(x,y)
-        C2=self.K2.cov(x,y)
-        g=dict({})
-        for k,v in self.K1.cov_grad(x,y).items():
-            g['K1:'+k]=v*C2
-        for k,v in self.K2.cov_grad(x,y).items():
-            g['K2:'+k]=v*C1
-        return g
 
 
 
@@ -216,13 +126,7 @@ class RBFKernel(Kernel):
         dist = cdist(x[:, None], y[:, None])
         return self.scaling*np.exp(-dist ** 2 / self.sigma ** 2)
 
-    def cov_grad(self,x,y):
-        g=dict({})
-        C=self.cov(x,y)
-        g['_log scaling']=C[None,:,:]
-        dist = cdist(x[:, None], y[:, None])
-        g['sigma']=C*(2*dist**2/self.sigma**3)[None,:,:]
-        return g
+
 
 
 class LinearKernel(Kernel):
@@ -231,10 +135,7 @@ class LinearKernel(Kernel):
         self.name='linear'
     def cov(self,x,y):
         return np.outer(x-self.theta,y-self.theta)
-    def cov_grad(self,x,y):
-        #(x_i-theta)(y_j-theta)
-        #-theta(x_i+y_j)+theta^2+const
-        return {'theta':(-self.theta*np.add.outer(x,y)+self.theta**2)[None,:,:]}
+
 
 class PeriodicKernel(Kernel):
     def __init__(self,frequency=1,sigma=1,scaling=1):
@@ -245,17 +146,7 @@ class PeriodicKernel(Kernel):
     def cov(self,x,y):
         abs_diffs=np.abs(np.add.outer(x,-y))
         return self.scaling*np.exp(-2*np.sin(np.pi*abs_diffs*self.frequency)**2/self.sigma**2)
-    def cov_grad(self,x,y):
-        g=dict({})
-        C=self.cov(x,y)
-        g['_log scaling']=C[None,:,:]
-        abs_diffs=np.abs(np.add.outer(x,-y))
-        #TODO: double check this
-        df=C*-2*2*np.sin(np.pi*abs_diffs*self.frequency)*np.cos(np.pi*abs_diffs*self.frequency)*np.pi*abs_diffs/self.sigma**2
-        g['frequency']=df[None,:,:]
-        ds=C*4*np.sin(np.pi*abs_diffs*self.frequency)**2/self.sigma**3
-        g['sigma']=ds[None,:,:]
-        return g
+
 
 
 
@@ -275,21 +166,7 @@ class SpectralMixtureKernel(Kernel):
         for w,mu,v in zip(self.weights,self.means,self.covs):
             k=k+w*np.exp(-2*v*(np.pi*tau)**2)*np.cos(2*np.pi*tau*mu)
         return k
-    def cov_grad(self,x,y):
-        g=dict({})
-        dmeans=[]
-        d_logcovs=[]
-        d_logweights=[]
-        tau=np.add.outer(x,-y)
 
-        for w,mu,v in zip(self.weights,self.means,self.covs):
-            dmeans.append(w*np.exp(-2*v*(np.pi*tau)**2)*(-np.sin(2*np.pi*tau*mu))*2*np.pi*tau)
-            d_logcovs.append(w*v*np.exp(-2*v*(np.pi*tau)**2)*np.cos(2*np.pi*tau*mu)*(-2)*(np.pi*tau)**2)
-            d_logweights.append(w*np.exp(-2*v*(np.pi*tau)**2)*np.cos(2*np.pi*tau*mu))
-        g['means']=np.array(dmeans)
-        g['_log covs']=np.array(d_logcovs)
-        g['_log weights']=np.array(d_logweights)
-        return g
 
 
 def sample_comp_kernel(k_i=None):
