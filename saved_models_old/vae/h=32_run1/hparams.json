@@ -1,0 +1,1 @@
+{"save_dir": "saved_models/vae/h=32_run1", "batch_size": 512, "n_epochs": 200, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.8, "y_jitter_strength": 2, "model_name": "vae", "vae_h": 32}
