@@ -1,1 +1,0 @@
-{"save_dir": "saved_models_may3/cpc/incl_ar_run0", "batch_size": 512, "n_epochs": 10, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.8, "y_jitter_strength": 2, "model_name": "cpc", "h_size": 128, "tnc_window": 10}

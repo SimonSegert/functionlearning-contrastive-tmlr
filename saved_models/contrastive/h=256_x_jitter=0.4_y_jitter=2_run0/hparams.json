@@ -1,1 +1,0 @@
-{"save_dir": "saved_models/contrastive/h=256_x_jitter=0.4_y_jitter=2_run0", "batch_size": 512, "n_epochs": 10, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.4, "y_jitter_strength": 2.0, "model_name": "contrastive", "h_size": 256, "tnc_window": 20}

@@ -7,29 +7,16 @@ np.random.seed(1234)
 from sklearn.linear_model import SGDClassifier
 import pandas as pd
 from ar import *
+from comparison_implementations.tloss.networks.causal_cnn import CausalCNNEncoder
+from comparison_implementations.tloss.scikit_wrappers import CausalCNNEncoderClassifier
+from comparison_implementations.TNC.tnc.models import RnnEncoder
+from copy import deepcopy
 
 
 
 device='cuda' if torch.cuda.is_available() else 'cpu'
-
-
-
-
+#locations of sample points on x axis
 xs=np.linspace(0,10,100)
-
-
-
-
-
-
-
-from comparison_implementations.tloss.networks.causal_cnn import CausalCNNEncoder
-from comparison_implementations.tloss.scikit_wrappers import CausalCNNEncoderClassifier
-from comparison_implementations.TNC.tnc.models import RnnEncoder
-
-
-
-from copy import deepcopy
 
 
 
@@ -124,13 +111,15 @@ model_hparams=[model_hparams[j] for j in as_ids]
 
 #evaluating the categorization and multiple choice tasks
 
-n_obs=80
+
+n_obs=80 #length of prompt curve in mc completion task
 n_eval_samples=200 #samples per kernel used for evaluations
 train_sample_range=[3,10,30,100,300]#different numbers of samples used for training
 mc_res=[]
 cl_res=[]
+n_kernel_hparams=10
 
-for task_id in range(10):
+for task_id in range(n_kernel_hparams):
     ns=n_eval_samples+max(train_sample_range)
     y0s,ys,labs,y0s_obs,ys_inp,ys_mix,ys_comp,ys_rbf,ys_true_ker,ys_rsc=generate_curves(kernel_samples=ns,n_obs=n_obs)
     #y0s: raw curves 
@@ -149,14 +138,6 @@ for task_id in range(10):
     ys_true_ker=torch.from_numpy(ys_true_ker).float().to(device)
     ys=torch.from_numpy(ys).float().to(device)
     
-    assert torch.max(ys_comp)<1+10**-6
-    assert torch.min(ys_comp)>-10**-6
-    assert torch.max(ys_mix)<1+10**-6
-    assert torch.min(ys_mix)>-10**-6
-    assert torch.max(ys)<1+10**-6
-    assert torch.min(ys)>-10**-6
-    
-    assert len(ys)==ns*14
     for model,hparams,autoreg in zip(models,model_hparams,auto_regs):
         #autoreg is "None" unless the model is cpc
         
@@ -164,9 +145,6 @@ for task_id in range(10):
         clf=SGDClassifier(loss='log',alpha=10**-5)
 
         mn=hparams['model_name']
-        print(mn)
-        xj=hparams['x_jitter_strength'] if mn=='contrastive' else np.nan
-        yj=hparams['y_jitter_strength'] if mn=='contrastive' else np.nan
         with torch.no_grad():
             inps=get_reps(model,ys,hparams,autoreg)
             inps=inps.cpu()
@@ -200,8 +178,7 @@ for task_id in range(10):
             targets=labs[val_ids]
 
             train_score,test_score=clf.score(inps[tr_ids],labs[tr_ids]),clf.score(inps[val_ids],labs[val_ids])
-
-            cl_res.append([test_score,mn,task_id,hparams['run_id'],hparams['h_size'],xj,yj,n_train_samples])
+            cl_res.append([test_score,mn,task_id,hparams['run_id'],hparams['h_size'],n_train_samples])
 
 
 
@@ -245,10 +222,10 @@ for task_id in range(10):
             for p,t,l in zip(probs,mc_targets,labs[mc_ids][mc_val]):
                 ktype=['comp','mix'][t]
                 
-                mc_res.append([p[t].item(),mn,l,task_id,hparams['run_id'],hparams['h_size'],xj,yj,n_train_samples,ktype])
+                mc_res.append([p[t].item(),mn,l,task_id,hparams['run_id'],hparams['h_size'],n_train_samples,ktype])
 
-cl_res=pd.DataFrame(cl_res,columns=['score','model name','task id','run id','h size','xjitter','yjitter','train size'])
-mc_res=pd.DataFrame(mc_res,columns=['pr correct','model name','kernel','task id','run id','h size','xjitter','yjitter','train size','ktype'])
+cl_res=pd.DataFrame(cl_res,columns=['score','model name','task id','run id','h size','train size'])
+mc_res=pd.DataFrame(mc_res,columns=['pr correct','model name','kernel','task id','run id','h size','train size','ktype'])
 
 
 print('categorization results:')
@@ -269,43 +246,32 @@ print('difference in accs on mc:')
 latex_table(qq,'comp minus mix',mult_100=True,ci='sem')
 
 #evaluation on the freeform task
-
 n_train_samples=300 #samples for training logistic regressor
-n_val_samples_range=[1,3,10,30,100]
-n_test_samples=300
+n_val_samples_range=[1,3,10,30,100] #additional samples from training autoregression model
+n_test_samples=300 #samples for evaluating extrapolation quality
 res2=[]
 window_size=20 #autoregressino window
 
 
 
-for task_id in range(10):
+for task_id in range(n_kernel_hparams):
     ns=n_train_samples+max(n_val_samples_range)+n_test_samples
     y0s,ys,labs,y0s_obs,ys_inp,ys_mix,ys_comp,ys_rbf,ys_true_ker,ys_rsc=generate_curves(kernel_samples=ns,n_obs=n_obs)
     ys_comp=torch.from_numpy(ys_comp).float().to(device)
     ys_mix=torch.from_numpy(ys_mix).float().to(device)
     ys_inp=torch.from_numpy(ys_inp).float().to(device)
     ys=torch.from_numpy(ys).float().to(device)
-    
-    assert torch.max(ys_comp)<1+10**-6
-    assert torch.min(ys_comp)>-10**-6
-    assert torch.max(ys_mix)<1+10**-6
-    assert torch.min(ys_mix)>-10**-6
-    assert torch.max(ys)<1+10**-6
-    assert torch.min(ys)>-10**-6
-    
-    assert len(ys)==ns*14
-    
+
     #compute errors for "oracle" gp baseline
     for i in range(len(ys)):
         d=np.mean((ys_true_ker[i,n_obs:]-ys_rsc[i,n_obs:])**2)**.5
         c=np.corrcoef(ys_true_ker[i,n_obs:],ys_rsc[i,n_obs:])[0,1]
-        res2.append([d,c,labs[i],'gp oracle',-1,task_id,-1,'true',False])
+        res2.append([d,c,labs[i],'gp oracle',-1,task_id,-1,'true'])
 
     
     for m_id,(model,hparams,autoreg) in enumerate(zip(models,model_hparams,auto_regs)):
         
         #first, fit the classifier on the training input curves 
-        #maybe it makes mores sense to use k-means? might be fairer to models that had poor classification
         tr_ids=np.arange(n_train_samples*14)
 
         clf=SGDClassifier(loss='log')
@@ -339,22 +305,20 @@ for task_id in range(10):
             pr_val=clf.predict_proba(h_obs[val_ids])
             cl_test=clf.predict(h_obs[test_ids])
             pr_test=clf.predict_proba(h_obs[test_ids])
-            for use_probs in [False]:
-                #probs variant does pretty terribly, so not included
-                #hierarchical lniear model, with group assignments predicted using the hidden rep
-                regs,*_=fit_hlm(ys_rsc[val_ids],cl_val,probs=pr_val,window=window_size,n_clusters=14,use_probs=use_probs)
-                preds=forecast_hlm(regs,ys_rsc[test_ids,:n_obs],cl_test,probs=pr_test,window=window_size,n_pts=20,use_probs=use_probs)
 
-                # measure distance on testing set
+            #hierarchical lniear model, with group assignments predicted using the hidden rep
+            regs,*_=fit_hlm(ys_rsc[val_ids],cl_val,probs=pr_val,window=window_size,n_clusters=14,use_probs=False)
+            preds=forecast_hlm(regs,ys_rsc[test_ids,:n_obs],cl_test,probs=pr_test,window=window_size,n_pts=20,use_probs=False)
 
-                target_labels=['true','comp','mix']
-                targets=[ys_rsc[test_ids,n_obs:],ys_comp[test_ids,n_obs:].cpu().numpy(),ys_mix[test_ids,n_obs:].cpu().numpy()]
+            # measure distance on testing set to each of the possible completions
+            target_labels=['true','comp','mix']
+            targets=[ys_rsc[test_ids,n_obs:],ys_comp[test_ids,n_obs:].cpu().numpy(),ys_mix[test_ids,n_obs:].cpu().numpy()]
 
-                for target_name,target in zip(target_labels,targets):
-                    for i in range(len(test_ids)):
-                        d=np.mean((preds[i]-target[i])**2)**.5
-                        c=np.corrcoef(preds[i],target[i])[0,1]
-                        res2.append([d,c,labs[test_ids][i],mn,n_val_samples,task_id,hparams['run_id'],target_name,use_probs])
+            for target_name,target in zip(target_labels,targets):
+                for i in range(len(test_ids)):
+                    d=np.mean((preds[i]-target[i])**2)**.5
+                    c=np.corrcoef(preds[i],target[i])[0,1]
+                    res2.append([d,c,labs[test_ids][i],mn,n_val_samples,task_id,hparams['run_id'],target_name])
 
             if m_id==0:
                 #comparison non-hierarchical autoregression, trained on same amount of data
@@ -378,11 +342,11 @@ for task_id in range(10):
                     for i in range(len(test_ids)):
                         d=np.mean((preds_ar[i]-target[i])**2)**.5
                         c=np.corrcoef(preds_ar[i],target[i])[0,1]
-                        res2.append([d,c,labs[test_ids][i],'ar',n_val_samples,task_id,hparams['run_id'],target_name,False])
+                        res2.append([d,c,labs[test_ids][i],'ar',n_val_samples,task_id,hparams['run_id'],target_name])
 
 
             
-res2=pd.DataFrame(res2,columns=['dist','corr','kernel','model','train size','task id','run id','target','use probs'])
+res2=pd.DataFrame(res2,columns=['dist','corr','kernel','model','train size','task id','run id','target'])
 
 print('freeform results, correlation:')
 bb=res2[res2['target']=='true'].groupby(['model','train size','task id','run id']).mean().reset_index()

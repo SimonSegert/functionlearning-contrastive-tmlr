@@ -18,9 +18,23 @@ def split_ar(x, window_size=10):
     Y = x[window_size:]
     return X, Y
 
+def split_ar_batch(xs, window=10):
+    #similar to split_ar, except xs canhave multiple rows
+    X = []
+    Y = []
+    curve_ids = []
+    for i, x in enumerate(xs):
+        x, y = split_ar(x, window_size=window)
+        X.append(x)
+        Y.append(y)
+        curve_ids = curve_ids + [i] * len(x)
+    X = np.vstack(X)
+    Y = np.concatenate(Y)
+    return X, Y, np.array(curve_ids)
+
 
 def extrapolate_ar(reg, xs, window=10, n_pts=20):
-    # use fitted ar model to extrapolate the series
+    # use a single fitted ar model to extrapolate the series
     # xs should be shape (n curves)x (curve lengths)
 
     # extrapolation for each curve
@@ -94,6 +108,8 @@ def fit_hlm(ys, cl, probs=None, window=10, n_clusters=14, use_probs=False):
 
 
 def forecast_hlm(regs, ys, cl, probs=None, window=10, n_pts=20, use_probs=False):
+    #given a fitted hlm and cluster assignments, forecast the curves
+    #using the respective autoregressive models
     if not use_probs:
         return np.vstack(
             [extrapolate_ar(regs[cl[i]], ys[i][None, :], window=window, n_pts=n_pts) for i in range(len(cl))])
@@ -102,15 +118,3 @@ def forecast_hlm(regs, ys, cl, probs=None, window=10, n_pts=20, use_probs=False)
         return np.sum(exts * probs[:, None, :], 2)
 
 
-def split_ar_batch(xs, window=10):
-    X = []
-    Y = []
-    curve_ids = []
-    for i, x in enumerate(xs):
-        x, y = split_ar(x, window_size=window)
-        X.append(x)
-        Y.append(y)
-        curve_ids = curve_ids + [i] * len(x)
-    X = np.vstack(X)
-    Y = np.concatenate(Y)
-    return X, Y, np.array(curve_ids)

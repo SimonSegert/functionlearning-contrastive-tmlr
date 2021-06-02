@@ -1,1 +1,0 @@
-{"save_dir": "saved_models/contrastive/x_jitter_strength=0.8_run2", "batch_size": 512, "n_epochs": 200, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.8, "y_jitter_strength": 2, "model_name": "contrastive", "vae_h": 512}

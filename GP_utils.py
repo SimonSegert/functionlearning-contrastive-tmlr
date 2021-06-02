@@ -3,13 +3,6 @@ from scipy.stats import multivariate_normal
 from scipy.spatial.distance import squareform,pdist,cdist
 
 
-def sample_gaussian(n,m=None,C=None):
-    #n: number of samples to take
-    #m: array of shape (n), giving mean for each point (if None, will be zero)
-    #C: array of shape (n,n), giving covariance (if None, will be identity)
-    #(for now, this just wraps the scipy function, but it may be useful in the future to
-    #have a more efficient sampler that uses a pre-computed diagonalization of C)
-    return multivariate_normal.rvs(mean=m,cov=C,size=n)
 #a fixed ordering of the kernel names
 KERNELNAMES=['linear','rbf','periodic',
              'linear+periodic','linear+rbf','rbf+periodic',
@@ -31,8 +24,8 @@ def sample_gaussian(n,m=None,C=None,use_svd=False):
     #n: number of samples to take
     #m: array of shape (n), giving mean for each point (if None, will be zero)
     #C: array of shape (n,n), giving covariance (if None, will be identity)
-    #(for now, this just wraps the scipy function, but it may be useful in the future to
-    #have a more efficient sampler that uses a pre-computed diagonalization of C)
+    #if use_svd, then will compute diagonalization of C
+    #can be faster depending on number of curves to sample
     if use_svd:
       eigs,evals,_=np.linalg.svd(C,full_matrices=True)
       #each column of eigs is an eigenvector

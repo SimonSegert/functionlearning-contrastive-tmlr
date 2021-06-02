@@ -8,6 +8,7 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 from scipy.special import logsumexp
 
+#extract global time series representation from each model type
 def get_reps(model, ys, model_hparams, auto_reg=None):
     # ys should be shape (n curves) x (length of curve)
     # auto_reg is ignored unless the model is cpc
@@ -92,7 +93,6 @@ def get_reps(model, ys, model_hparams, auto_reg=None):
 
 def generate_curves(kernel_samples=2048, n_obs=80):
     labs = []
-    inps2 = []
     y0s = []
 
     ys = []
@@ -148,9 +148,7 @@ def generate_curves(kernel_samples=2048, n_obs=80):
     y0s_comp = np.concatenate((y0s_obs, comp_comps), 1)
     y0s_rbf = np.concatenate((y0s_obs, rbf_comps), 1)
     y0s_true = np.concatenate((y0s_obs, true_comps), 1)
-    y0s_zero = np.copy(y0s_mix)
 
-    # y0s_zero[:,n_obs:]=y0s[:,n_obs][:,None]
 
     # rescale so that the sampled curve, the compositional completion, and mixture completion
     # all line in [0,1]
@@ -164,9 +162,6 @@ def generate_curves(kernel_samples=2048, n_obs=80):
 
     y0s_mix = (y0s_mix - all_min) / (all_max - all_min)
     y0s_mix = y0s_mix * (new_maxs - new_mins)[:, None] + new_mins[:, None]
-
-    y0s_zero = (y0s_zero - all_min) / (all_max - all_min)
-    y0s_zero = y0s_zero * (new_maxs - new_mins)[:, None] + new_mins[:, None]
 
     y0s_rbf = (y0s_rbf - all_min) / (all_max - all_min)
     y0s_rbf = y0s_rbf * (new_maxs - new_mins)[:, None] + new_mins[:, None]
