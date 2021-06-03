@@ -12,13 +12,11 @@ def position_jitter(inp, sigma=.1, xs=None, strength=1, use_scaling=True):
     lx = max(xs) - min(xs)
     left = min(xs) - lx * np.random.uniform(low=0, high=strength, size=len(inp))
     right = max(xs) + lx * np.random.uniform(low=0, high=strength, size=len(inp))
-
     new_pts = np.random.uniform(size=len(xs))
     new_pts = new_pts * (right - left)[:, None] + left[:, None]
     new_pts = np.sort(new_pts, axis=1)
     # dd=-.5*np.add.outer(new_pts,-xs)**2/sigma**2
     dd = -.5 * (new_pts[:, :, None] - xs[None, None, :]) ** 2 / sigma ** 2
-
     if use_scaling:
         dd = np.exp(dd - logsumexp(dd, axis=1)[:, None, :])
     else:
@@ -45,11 +43,9 @@ def rand_rescale(inp, min_ht=.8):
 
     new_mins = np.random.uniform(size=len(inp), low=0, high=(1 - min_ht) / 2)
     new_maxs = np.random.uniform(size=len(inp), low=(1 + min_ht) / 2, high=1)
-
     # first rescale so min=0 and max=1
     outp = inp - np.min(inp, axis=1)[:, None]
     outp = outp / np.max(outp, axis=1)[:, None]
-
     outp = outp * (new_maxs - new_mins)[:, None] + new_mins[:, None]
     return outp
 

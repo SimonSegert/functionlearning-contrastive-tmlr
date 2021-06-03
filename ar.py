@@ -4,9 +4,6 @@ from sklearn.model_selection import GridSearchCV
 
 #utilities for fitting linear autoregressive models
 
-
-
-
 def split_ar(x, window_size=10):
     # split time series into array of windows, with next point being predictors
     # x should be 1 dimensional array
@@ -40,7 +37,6 @@ def extrapolate_ar(reg, xs, window=10, n_pts=20):
     # extrapolation for each curve
     exts = []
     inp = xs[:, -window:]
-
     for _ in range(n_pts):
         exts.append(reg.predict(inp)[:, None])  # shape (n curves x 1)
         inp = np.concatenate((inp[:, 1:], exts[-1]), 1)
@@ -75,7 +71,6 @@ def fit_hlm(ys, cl, probs=None, window=10, n_clusters=14, use_probs=False):
         for r_id in range(probs.shape[0]):
             for col_id in range(probs.shape[1]):
                 class_ind[r_id, col_id * window:col_id * (window + 1)] = probs[r_id, col_id]
-
     X1 = np.concatenate([X for _ in range(max(c_id) + 1)], 1)
     X2 = np.concatenate([X for _ in range(n_clusters)], 1)
     assert X2.shape == class_ind.shape, print(X2.shape, class_ind.shape)
@@ -91,7 +86,6 @@ def fit_hlm(ys, cl, probs=None, window=10, n_clusters=14, use_probs=False):
     )
     grid_search.fit(X, Y)
     reg = grid_search.best_estimator_
-
     reg.fit(X, Y)
     c0 = reg.coef_[:window]
     # coef/intercept for each class

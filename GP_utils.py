@@ -18,8 +18,6 @@ def spectral_ent(C):
     spectral_ent=-np.sum(evals_n*np.log(evals_n)) #measure of predictability; the higher this entropy, the more like white noise
     return spectral_ent
 
-
-
 def sample_gaussian(n,m=None,C=None,use_svd=False):
     #n: number of samples to take
     #m: array of shape (n), giving mean for each point (if None, will be zero)
@@ -35,7 +33,6 @@ def sample_gaussian(n,m=None,C=None,use_svd=False):
 
     return multivariate_normal.rvs(mean=m,cov=C,size=n)
 
-
 class Kernel():
     #base class for a kernel, not meant to be instantiated directly
     def __init__(self,**kwargs):
@@ -45,12 +42,9 @@ class Kernel():
         return KERNELNAMES.index(self.name)
     def depth(self):
         return KERNELDEPTHS[self.id()]
-
-
     def cov(self,x,y):
         #given vectors x and y of possibly different lengths, return the covariance matrix K(x_i,y_j)
         raise NotImplementedError()
-
     def posterior(self,x_obs,y_obs,x_test,K11_inverse=None,inv_reg=0):
         #given array x_obs and values y_obs, return the mean and covariance matrix of the posterior at x_test
         #can optionally give precomputed value for K11_inverse= K(x_obs,x_obs)^{-1}; if None then will be computed directly
@@ -60,21 +54,15 @@ class Kernel():
         # compute the inverse covariance matrix of the data points, if not suppled
         K11 = self.cov(x_obs, x_obs) if K11_inverse is None else 0
         K11_inv = np.linalg.inv(K11+inv_reg*np.eye(len(x_obs))) if K11_inverse is None else K11_inverse
-
         K22 = self.cov(x_test, x_test)
         mu = np.dot(K12.T, np.dot(K11_inv, y_obs))
         sigma = K22 - np.dot(K12.T, np.dot(K11_inv, K12))
         return mu, sigma
 
-
-
     def llh(self,x_obs, y_obs,inv_reg=0):
         #the log-likelihood of the observations
         C=self.cov(x_obs,x_obs)+inv_reg*np.eye(len(x_obs))
         return -.5*np.sum(y_obs*np.dot(np.linalg.inv(C),y_obs))-.5*np.linalg.slogdet(C)[1]-.5*len(x_obs)*np.log(2*np.pi)
-
-
-   
 
 
 class WhiteNoiseKernel(Kernel):
@@ -94,10 +82,6 @@ class SumKernel(Kernel):
     def cov(self,x,y):
         return self.K1.cov(x,y)+self.K2.cov(x,y)
 
-
-
-
-
 class ProductKernel(Kernel):
     def __init__(self,K1,K2):
         self.K1=K1
@@ -105,10 +89,6 @@ class ProductKernel(Kernel):
         self.name=K1.name+'*'+K2.name
     def cov(self,x,y):
         return self.K1.cov(x,y)*self.K2.cov(x,y)
-
-
-
-
 
 class RBFKernel(Kernel):
     def __init__(self,sigma=1,scaling=1):
@@ -119,16 +99,12 @@ class RBFKernel(Kernel):
         dist = cdist(x[:, None], y[:, None])
         return self.scaling*np.exp(-dist ** 2 / self.sigma ** 2)
 
-
-
-
 class LinearKernel(Kernel):
     def __init__(self,theta=0):
         self.theta=theta
         self.name='linear'
     def cov(self,x,y):
         return np.outer(x-self.theta,y-self.theta)
-
 
 class PeriodicKernel(Kernel):
     def __init__(self,frequency=1,sigma=1,scaling=1):
@@ -139,9 +115,6 @@ class PeriodicKernel(Kernel):
     def cov(self,x,y):
         abs_diffs=np.abs(np.add.outer(x,-y))
         return self.scaling*np.exp(-2*np.sin(np.pi*abs_diffs*self.frequency)**2/self.sigma**2)
-
-
-
 
 class SpectralMixtureKernel(Kernel):
     def __init__(self,means=None,covs=None,weights=None):
@@ -160,8 +133,6 @@ class SpectralMixtureKernel(Kernel):
             k=k+w*np.exp(-2*v*(np.pi*tau)**2)*np.cos(2*np.pi*tau*mu)
         return k
 
-
-
 def sample_comp_kernel(k_i=None):
     k_id = np.random.choice(13) if k_i is None else k_i
     lin_params = dict({})
@@ -173,7 +144,6 @@ def sample_comp_kernel(k_i=None):
     periodic_params['scaling'] = 1 + 2 * np.random.rand()
     periodic_params['frequency'] = .5 + np.random.rand()
     periodic_params['sigma'] = 1 + np.random.rand() * 4
-
     hparams = dict({})
     hparams['linear'] = lin_params
     hparams['rbf'] = rbf_params
@@ -181,10 +151,8 @@ def sample_comp_kernel(k_i=None):
     KL = LinearKernel(**hparams['linear'])
     KP = PeriodicKernel(**hparams['periodic'])
     KRBF = RBFKernel(**hparams['rbf'])
-
     comps = get_comp_kernels(KL, KRBF, KP)
     K = comps[k_id]
-
     noise = np.random.rand()
     multiplier = .005
     # if K.name=='linear':
@@ -199,7 +167,6 @@ def get_comp_kernels(linear_kernel, rbf_kernel, periodic_kernel):
     # returns a list of kernels generated according to the grammar in the schulz paper
     # the three arguments should be instances of the respective 3 classes
     # the ordering is the same as in the KERNELNAMES variable
-
     lin = linear_kernel
     rbf = rbf_kernel
     per = periodic_kernel  # aliases for typing convenience
@@ -210,15 +177,12 @@ def get_comp_kernels(linear_kernel, rbf_kernel, periodic_kernel):
     kernels.append(ProductKernel(lin, per))
     kernels.append(ProductKernel(lin, rbf))
     kernels.append(ProductKernel(per, rbf))
-
     kernels.append(SumKernel(SumKernel(lin, rbf), per))
     kernels.append(SumKernel(ProductKernel(per, rbf), lin))
     kernels.append(SumKernel(ProductKernel(lin, rbf), per))
     kernels.append(ProductKernel(ProductKernel(lin, rbf), per))
-
     assert [k.name for k in kernels] == KERNELNAMES[:-1]
     return kernels
-
 
 def sample_mix_kernel():
     q = np.random.choice(np.arange(2, 7))
