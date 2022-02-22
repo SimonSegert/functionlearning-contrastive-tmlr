@@ -46,6 +46,12 @@ if args.model_name=='contrastive':
     head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
     opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
     head.train()
+elif args.model_name=='contrastive-fc-encoder':
+    model=ConvEncoder(convolutional=False,h_size=h_size).to(device)
+    head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
+    opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
+    head.train()
+
 elif args.model_name=='contrastive-cnp-encoder':
     model=CNPEncoder(h_size=h_size).to(device)
     head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
@@ -147,7 +153,7 @@ for ii in range(n_iters):
         labs = labs + [K.id()] * len(y1)
     labs = torch.Tensor(labs).long()
     y = np.concatenate(y, axis=0)
-    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder':
+    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder' or args.model_name=='contrastive-fc-encoder':
         yhat=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
         y=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
         y = torch.from_numpy(y).float().to(device)

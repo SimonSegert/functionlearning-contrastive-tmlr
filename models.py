@@ -76,7 +76,6 @@ class CNPEncoder(torch.nn.Module):
 
 
 class ConvEncoder(torch.nn.Module):
-    # reconstruct an image, but using the inductive bias of passing through a pattern completion module
     def __init__(self, convolutional=False,h_size=512):
         super(ConvEncoder, self).__init__()
         self.convolutional = convolutional
@@ -96,9 +95,10 @@ class ConvEncoder(torch.nn.Module):
                                                             ])
 
         else:
-            self.seq1 = torch.nn.Sequential(*[torch.nn.Linear(100, 32), torch.nn.LeakyReLU(),
-                                              torch.nn.Linear(32, 32), torch.nn.LeakyReLU(),
-                                              torch.nn.Linear(32, 512)])
+            self.seq1 = torch.nn.Sequential(*[torch.nn.Linear(100, 256), torch.nn.LeakyReLU(),
+                                              torch.nn.Linear(256, 150), torch.nn.LeakyReLU(),
+                                              torch.nn.Linear(150, 128), torch.nn.LeakyReLU(),
+                                              torch.nn.Linear(128, h_size)])
 
     def forward(self, x):
         x=self.bn0(x)
