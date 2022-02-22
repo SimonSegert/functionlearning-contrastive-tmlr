@@ -46,6 +46,15 @@ if args.model_name=='contrastive':
     head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
     opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
     head.train()
+elif args.model_name=='contrastive-cnp-encoder':
+    model=CNPEncoder(h_size=h_size).to(device)
+    head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
+    opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
+    head.train()
+elif args.model_name=='cnp':
+    model=CNP(h_size=h_size).to(device)
+    opt=torch.optim.Adam(model.parameters(),lr=args.lr)
+
 elif args.model_name=='vae':
     model=VAE(h_size=args.h_size).to(device)
     opt=torch.optim.Adam(model.parameters(),lr=args.lr)
@@ -138,7 +147,7 @@ for ii in range(n_iters):
         labs = labs + [K.id()] * len(y1)
     labs = torch.Tensor(labs).long()
     y = np.concatenate(y, axis=0)
-    if args.model_name=='contrastive':
+    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder':
         yhat=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
         y=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
         y = torch.from_numpy(y).float().to(device)
@@ -154,6 +163,39 @@ for ii in range(n_iters):
         opt.step()
         losses.append(l.item())
         accs.append(acc)
+    elif args.model_name=='cnp':
+        y=rand_rescale(y)
+        y=torch.from_numpy(y).float().to(device)
+        xpos=1.0*torch.arange(y.shape[1])/y.shape[1]
+        xpos=torch.cat([xpos[None,:] for _ in range(len(y))],0).to(device)
+        #select 10 points at random from each curve for testing
+        #since the encoder is order-invariant we can do this by shuffling each row independently
+        yshuff=[]
+        xposshuff=[]
+        for ii in range(len(y)):
+            rp=np.random.permutation(y.shape[1])
+            yshuff.append(y[ii][rp].unsqueeze(0))
+            xposshuff.append(xpos[ii][rp].unsqueeze(0))
+        yshuff=torch.cat(yshuff,0)
+        xposshuff=torch.cat(xposshuff,0)
+
+        xobs=xposshuff[:,:90]
+        yobs=yshuff[:,:90]
+
+        xtest=xposshuff[:,90:]
+        ytest=yshuff[:,90:]
+
+        mu,logsigma=model(xobs,yobs,xtest)
+        #maximize normal log likelihoood of test points
+        dy=ytest-mu
+        llh=-.5*torch.exp(-2*logsigma)*dy*dy-logsigma
+        l=-llh.mean()
+        l.backward()
+        opt.step()
+        losses.append(l.item())
+        accs.append(-1)
+
+
     elif args.model_name=='vae':
         y=rand_rescale(y)
         y=torch.from_numpy(y).float().to(device)

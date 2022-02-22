@@ -1,4 +1,79 @@
 import torch
+class CNP(torch.nn.Module):
+    def __init__(self,h_size=128):
+        super(CNP,self).__init__()
+
+        self.h_size=h_size
+        self.enc=CNPEncoder(h_size=h_size)
+        #for each query point, decodes mean and variance conditional on the "r" vector
+        self.dec=torch.nn.Sequential(*[torch.nn.Linear(h_size+1,32),torch.nn.LeakyReLU(),
+                                       torch.nn.Linear(32,2)])
+    def forward(self,xobs,yobs,xt):
+        #mean and logsigma of each point at xt, conditional on observed points
+
+        #xobs:(n sequences) x (n observed points)
+        #yobs: (n sequences) x (n observed points)
+        #xt: (n sequences) x (n query points)
+        #all sequences are assumed to have same number of observed/query points, but
+        #locations of these points can vary
+
+        #(n sequences) x (h size)
+        r=self.enc(yobs,x_positions=xobs)
+        mu=[]
+        logsigma=[]
+        #decode each point one by one
+        for ii in range(xt.shape[1]):
+            inp=torch.cat((r,xt[:,ii].unsqueeze(1)),1)
+            phi=self.dec(inp)
+            mu.append(phi[:,0][:,None])
+            logsigma.append(phi[:,1][:,None])
+        mu=torch.cat(mu,axis=1)
+        logsigma=torch.cat(logsigma,axis=1)
+        return mu,logsigma
+
+class CNPEncoder(torch.nn.Module):
+    #permutation-invariant encoder used in Neural Processes
+    #for simplicity, we assume that the position of observation points is always constant
+    #so we do not include it as input
+    def __init__(self,h_size=128):
+        super(CNPEncoder,self).__init__()
+        self.h_size=h_size
+        self.bn0=torch.nn.BatchNorm1d(2)
+        self.mlp=torch.nn.Sequential(*[torch.nn.Linear(2,64),torch.nn.LeakyReLU(),
+                                       torch.nn.BatchNorm1d(64),
+                                       torch.nn.Linear(64,128),torch.nn.LeakyReLU(),
+                                       torch.nn.BatchNorm1d(128),
+                                       torch.nn.Linear(128,h_size)])
+
+    def forward(self,x,x_positions=None):
+        #input should be shape (batch size) x (sequence length)
+        #xpositions should be (batch size) x (sequence length)
+        #defaults to uniform grid on [0,1]
+        seq_len=x.shape[1]
+        #create an array of x positions
+        #since all positions are assumed to be constant over different sequences, we use dummy coding of pos integers
+        if x_positions is None:
+            xpos=1.0*torch.arange(seq_len).to(x.device)/seq_len
+            xpos=torch.cat([xpos for _ in range(len(x))])
+            xpos=xpos.unsqueeze(1)
+        else:
+            xpos=1.0*torch.cat([a for a in x_positions])
+            xpos=xpos.unsqueeze(1)
+        #all entries from first sequence, then all entries of second sequence, etc.
+        xf=torch.cat([x[i] for i in range(x.shape[0])])
+        xf=xf.unsqueeze(1)
+
+        xf=torch.cat((xf,xpos),axis=1)
+        xf=self.bn0(xf)
+
+        rn=self.mlp(xf)
+        #average over entries of each sequence
+        r=torch.cat([torch.mean(rn[i:i+seq_len,:],axis=0).unsqueeze(0) for i in range(0,len(xf),seq_len)],axis=0)
+        return r
+
+
+
+
 
 class ConvEncoder(torch.nn.Module):
     # reconstruct an image, but using the inductive bias of passing through a pattern completion module

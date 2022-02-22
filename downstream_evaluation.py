@@ -1,5 +1,5 @@
 import os
-from models import ConvEncoder,VAE
+from models import ConvEncoder,VAE,CNPEncoder,CNP
 import json
 from evaluation_utils import *
 from GP_utils import *
@@ -30,6 +30,11 @@ for folder_name in os.listdir(models_dir):
             continue
         if hparams['model_name']=='contrastive':
             model=ConvEncoder(convolutional=True,h_size=hparams['h_size']).to(device)
+        elif hparams['model_name']=='contrastive-cnp-encoder':
+            model=CNPEncoder(h_size=hparams['h_size']).to(device)
+        elif hparams['model_name']=='cnp':
+            model=CNP(h_size=hparams['h_size']).to(device)
+
         elif hparams['model_name']=='vae':
             model=VAE(h_size=hparams['h_size']).to(device)
         elif hparams['model_name']=='t-loss':
