@@ -105,8 +105,11 @@ class ConvEncoder(torch.nn.Module):
 
     def forward(self, x):
         x=self.bn0(x)
-        x=x.unsqueeze(1)
-        return self.seq1(x).squeeze(1)
+        if self.convolutional:
+            x=x.unsqueeze(1)
+            return self.seq1(x).squeeze(1)
+        else:
+            return self.seq1(x)
 class VAE(torch.nn.Module):
     def __init__(self,h_size=512):
         super(VAE, self).__init__()
