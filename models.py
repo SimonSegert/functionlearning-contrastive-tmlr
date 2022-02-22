@@ -96,8 +96,11 @@ class ConvEncoder(torch.nn.Module):
 
         else:
             self.seq1 = torch.nn.Sequential(*[torch.nn.Linear(100, 256), torch.nn.LeakyReLU(),
+                                              torch.nn.BatchNorm1d(256),
                                               torch.nn.Linear(256, 150), torch.nn.LeakyReLU(),
+                                              torch.nn.BatchNorm1d(150),
                                               torch.nn.Linear(150, 128), torch.nn.LeakyReLU(),
+                                              torch.nn.BatchNorm1d(128),
                                               torch.nn.Linear(128, h_size)])
 
     def forward(self, x):
