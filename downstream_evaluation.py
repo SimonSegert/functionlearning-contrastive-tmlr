@@ -30,6 +30,8 @@ for folder_name in os.listdir(models_dir):
             continue
         if hparams['model_name']=='contrastive':
             model=ConvEncoder(convolutional=True,h_size=hparams['h_size']).to(device)
+        elif hparams['model_name']=='contrastive-fc-encoder':
+            model=ConvEncoder(convolutional=False,h_size=hparams['h_size']).to(device)
         elif hparams['model_name']=='contrastive-cnp-encoder':
             model=CNPEncoder(h_size=hparams['h_size']).to(device)
         elif hparams['model_name']=='cnp':

@@ -17,7 +17,7 @@ def get_reps(model, ys, model_hparams, auto_reg=None):
     dl = torch.utils.data.DataLoader(ys, batch_size=256, shuffle=False)
     if mn == 'native':
         inps = ys.clone()
-    elif mn == 'contrastive' or mn=='contrastive-cnp-encoder':
+    elif mn == 'contrastive' or mn=='contrastive-cnp-encoder' or mn=='contrastive-fc-encoder':
         # inps=model(ys)
         inps = torch.cat([model(x) for x in dl], 0)
     elif mn=='cnp':
