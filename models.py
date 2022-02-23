@@ -39,11 +39,17 @@ class CNPEncoder(torch.nn.Module):
         super(CNPEncoder,self).__init__()
         self.h_size=h_size
         self.bn0=torch.nn.BatchNorm1d(2)
-        self.mlp=torch.nn.Sequential(*[torch.nn.Linear(2,64),torch.nn.LeakyReLU(),
-                                       torch.nn.BatchNorm1d(64),
-                                       torch.nn.Linear(64,128),torch.nn.LeakyReLU(),
-                                       torch.nn.BatchNorm1d(128),
-                                       torch.nn.Linear(128,h_size)])
+        #self.mlp=torch.nn.Sequential(*[torch.nn.Linear(2,64),torch.nn.LeakyReLU(),
+                                       #torch.nn.BatchNorm1d(64),
+                                       #torch.nn.Linear(64,128),torch.nn.LeakyReLU(),
+                                       #torch.nn.BatchNorm1d(128),
+                                       #torch.nn.Linear(128,h_size)])
+
+        self.mlp = torch.nn.Sequential(*[torch.nn.Linear(2, 512), torch.nn.LeakyReLU(),
+                                    torch.nn.BatchNorm1d(512),
+                                    torch.nn.Linear(512, 150), torch.nn.LeakyReLU(),
+                                    torch.nn.BatchNorm1d(150),
+                                    torch.nn.Linear(150, 128)])
 
     def forward(self,x,x_positions=None):
         #input should be shape (batch size) x (sequence length)
