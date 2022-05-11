@@ -1,0 +1,1 @@
+{"save_dir": "saved_models/contrastive-fc-encoder/run1", "batch_size": 512, "n_epochs": 10, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.4, "y_jitter_strength": 0.0, "model_name": "contrastive-fc-encoder", "h_size": 128, "tnc_window": 20}
