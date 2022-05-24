@@ -54,7 +54,7 @@ def rand_rescale(inp, min_ht=.8):
 def full_jitter(y,y_strength=2,x_strength=.8,xs=None,incl_y_jitter=True,incl_position_jitter=True,incl_rescale=True):
     yhat = y_jitter(y, strength=y_strength) if incl_y_jitter else y
     yhat = position_jitter(yhat, sigma=.1, strength=x_strength,xs=xs) if incl_position_jitter else yhat
-    yhat = rand_rescale(yhat) if incl_rescale else rand_rescale(inp,min_ht=1)
+    yhat = rand_rescale(yhat) if incl_rescale else rand_rescale(yhat,min_ht=1)
     #if not applying this augmentation, ensure all curves still lie in [0,1]
     return yhat
 

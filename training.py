@@ -50,7 +50,7 @@ incl_y_jitter=args.incl_y_jitter>0
 incl_position_jitter=args.incl_position_jitter>0
 incl_rescale=args.incl_rescale>0
 
-if args.model_name=='contrastive':
+if args.model_name=='contrastive' or args.model_name.startswith('contrastive_ablation'):
     model=ConvEncoder(convolutional=True,h_size=h_size).to(device)
     head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
     opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
@@ -162,7 +162,7 @@ for ii in range(n_iters):
         labs = labs + [K.id()] * len(y1)
     labs = torch.Tensor(labs).long()
     y = np.concatenate(y, axis=0)
-    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder' or args.model_name=='contrastive-fc-encoder':
+    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder' or args.model_name=='contrastive-fc-encoder' or args.model_name.startswith('contrastive_ablation'):
         yhat=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs,
                          incl_y_jitter=incl_y_jitter,incl_position_jitter=incl_position_jitter,incl_rescale=incl_rescale)
         y=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs,
