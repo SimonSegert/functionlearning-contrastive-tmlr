@@ -7,6 +7,41 @@ import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 from scipy.special import logsumexp
+import pyGPs
+
+
+def optimized_posterior(y_obs,k_id):
+    #fit the hyperparameters of the kernel before computing the posterior
+    #y_obs=single vector of length <100
+    #returns posterior and fitted marginal likelihood of original
+
+    model = pyGPs.GPR()  # specify model (GP regression)
+    k = get_cov_pygp(k_id)
+    model.setPrior(kernel=k)
+    model.setOptimizer("Minimize", num_restarts=1)
+    model.optimizer.logger.disabled=True
+    n_obs=len(y_obs)
+    #model.getPosterior(xs[:n_obs][:,None], y_obs[:,None])  # fit default model (mean zero & rbf kernel) with data
+    try:
+        model.optimize(xs[:n_obs][:,None], y_obs[:,None])
+    except:
+        print(f'warning: optimization failed on kernel class {k_id},defaulting to prior')
+    post,*_=model.predict(xs[n_obs:])  # predict test cases
+    llh=-model.nlZ #nlz is NEGATIVE log likelihood
+    return post.squeeze(),llh
+
+def optimized_cg_posterior(y_obs):
+    #optimizes for each of the cg kernels, and returns posterior of the one with highest marginal likelihood
+    comps=[]
+    llhs=[]
+    for i in range(3,13):
+        c,l=optimized_posterior(y_obs,i)
+        comps.append(c)
+        llhs.append(l)
+    return comps[np.argmax(llhs)],np.argmax(llhs)
+
+
+
 
 #extract global time series representation from each model type
 def get_reps(model, ys, model_hparams, auto_reg=None):
@@ -17,7 +52,7 @@ def get_reps(model, ys, model_hparams, auto_reg=None):
     dl = torch.utils.data.DataLoader(ys, batch_size=256, shuffle=False)
     if mn == 'native':
         inps = ys.clone()
-    elif mn == 'contrastive' or mn=='contrastive-cnp-encoder' or mn=='contrastive-fc-encoder':
+    elif mn == 'contrastive' or mn=='contrastive-cnp-encoder' or mn=='contrastive-fc-encoder' or mn.startswith('contrastive_ablation'):
         # inps=model(ys)
         inps = torch.cat([model(x) for x in dl], 0)
     elif mn=='cnp':
@@ -85,7 +120,8 @@ def get_reps(model, ys, model_hparams, auto_reg=None):
         raise ValueError('')
     return inps
 
-def generate_curves(kernel_samples=2048, n_obs=80):
+def generate_curves(kernel_samples=2048, n_obs=80,optimize_hyps=False):
+    #if optimize_hyps, then completions in mc problem will fit hyperparameters to the prompt curve
     labs = []
     y0s = []
     ys = []
@@ -114,15 +150,21 @@ def generate_curves(kernel_samples=2048, n_obs=80):
                      range(14)]).T
     Cinvs = [np.linalg.inv(cov_mats[i][:n_obs, :n_obs]) for i in range(len(cov_mats))]
     y0s_obs = y0s[:, :n_obs]
-    mix_comps = np.vstack(
+    if optimize_hyps:
+        mix_comps=np.vstack([optimized_posterior(y0s[i,:n_obs],13)[0] for i in range(len(y0s))])
+        comp_comps=np.vstack([optimized_cg_posterior(y0s[i,:n_obs])[0] for i in range(len(y0s))])
+        rbf_comps=np.vstack([optimized_posterior(y0s[i,:n_obs],1)[0] for i in range(len(y0s))])
+
+    else:
+        mix_comps = np.vstack(
         [kernels[-1].posterior(xs[:n_obs], y0s[i, :n_obs], xs[n_obs:], K11_inverse=Cinvs[-1])[0] for i in
          range(len(y0s))])
-    comp_comps = np.vstack([kernels[3 + np.argmax(llh[i, 3:13] + 3)].posterior(xs[:n_obs], y0s[i, :n_obs], xs[n_obs:],
+        comp_comps = np.vstack([kernels[3 + np.argmax(llh[i, 3:13] + 3)].posterior(xs[:n_obs], y0s[i, :n_obs], xs[n_obs:],
                                                                                K11_inverse=Cinvs[
                                                                                    3 + np.argmax(llh[i, 3:13])])[0] for
                             i in range(len(y0s))])
 
-    rbf_comps = np.vstack(
+        rbf_comps = np.vstack(
         [kernels[1].posterior(xs[:n_obs], y0s[i, :n_obs], xs[n_obs:], K11_inverse=Cinvs[1])[0] for i in
          range(len(y0s))])
     # posterior using the true generative kernel
