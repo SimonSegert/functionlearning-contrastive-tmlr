@@ -18,7 +18,7 @@ xs=np.linspace(0,10,100)
 
 #load in the saved models
 save_res=True
-models_dir='saved_models'#'augmentation_ablations'
+models_dir='augmentation_ablations' #saved_modles
 models=[]
 auto_regs=[] #only used for cpc
 model_hparams=[]
@@ -103,8 +103,8 @@ train_sample_range=[3,10,30,100,300]#different numbers of samples used for train
 mc_res=[]
 cl_res=[]
 #number of kernel hparams to average over
-n_kernel_hparams=3#10
-optimize_hyps=True
+n_kernel_hparams=10#3
+optimize_hyps=False#True
 if optimize_hyps:
     print(f'optimizing hparams for mc')
 print(f'kernel samples={n_kernel_hparams}')
@@ -209,6 +209,7 @@ print('mc results:')
 latex_table(rr,'pr correct',mult_100=True,ci='sem')
 if save_res:
     rr.to_csv(f'{models_dir}_mc_res.csv')
+    mc_res.to_csv(f'{models_dir}_mc_res_full.csv')
 
 #show bias towards compositional vs mixture complextions
 qq=mc_res.groupby(['ktype','model name','run id','task id','train size']).mean().reset_index()
@@ -314,6 +315,8 @@ latex_table(bb,'corr',sigfigs=2,ci='sem',mult_100=True)
 print('freeform results, mse:')
 latex_table(bb,'dist',sigfigs=4,ci='sem',mult_100=False)
 
+if save_res:
+    bb.to_csv(f'{models_dir}_freeform_res.csv')
 
 
 
