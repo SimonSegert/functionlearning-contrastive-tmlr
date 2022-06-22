@@ -1,0 +1,1 @@
+{"save_dir": "augmentation_ablations/contrastive_ablation_posjitter/run1", "batch_size": 512, "n_epochs": 10, "tau": 0.5, "lr": 0.001, "weight_decay": 1e-06, "x_jitter_strength": 0.4, "y_jitter_strength": 0.0, "model_name": "contrastive_ablation_posjitter", "h_size": 128, "tnc_window": 20, "incl_y_jitter": 0, "incl_position_jitter": 1, "incl_rescale": 0}
