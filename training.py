@@ -26,6 +26,10 @@ parser.add_argument('--model_name',type=str,default='contrastive')
 parser.add_argument('--h_size',type=int,default=512)
 parser.add_argument('--tnc_window',type=int,default=20)
 
+#ablations for different classes of augmentation-ignored if not contrastive model
+parser.add_argument('--incl_y_jitter',type=int,default=1)
+parser.add_argument('--incl_position_jitter',type=int,default=1)
+parser.add_argument('--incl_rescale',type=int,default=1)
 device='cuda' if torch.cuda.is_available() else'cpu'
 xs=np.linspace(0,10,100)
 
@@ -41,7 +45,12 @@ cl_accs=[]
 
 h_size=args.h_size
 z_size=128
-if args.model_name=='contrastive':
+
+incl_y_jitter=args.incl_y_jitter>0
+incl_position_jitter=args.incl_position_jitter>0
+incl_rescale=args.incl_rescale>0
+
+if args.model_name=='contrastive' or args.model_name.startswith('contrastive_ablation'):
     model=ConvEncoder(convolutional=True,h_size=h_size).to(device)
     head=torch.nn.Sequential(*[torch.nn.Linear(h_size,z_size),torch.nn.LeakyReLU(),torch.nn.Linear(z_size,z_size)]).to(device)
     opt=torch.optim.Adam(list(model.parameters())+list(head.parameters()),lr=args.lr)
@@ -153,9 +162,11 @@ for ii in range(n_iters):
         labs = labs + [K.id()] * len(y1)
     labs = torch.Tensor(labs).long()
     y = np.concatenate(y, axis=0)
-    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder' or args.model_name=='contrastive-fc-encoder':
-        yhat=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
-        y=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs)
+    if args.model_name=='contrastive' or args.model_name=='contrastive-cnp-encoder' or args.model_name=='contrastive-fc-encoder' or args.model_name.startswith('contrastive_ablation'):
+        yhat=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs,
+                         incl_y_jitter=incl_y_jitter,incl_position_jitter=incl_position_jitter,incl_rescale=incl_rescale)
+        y=full_jitter(y,x_strength=args.x_jitter_strength,y_strength=args.y_jitter_strength,xs=xs,
+                      incl_y_jitter=incl_y_jitter,incl_position_jitter=incl_position_jitter,incl_rescale=incl_rescale)
         y = torch.from_numpy(y).float().to(device)
         yhat = torch.from_numpy(yhat).float().to(device)
 

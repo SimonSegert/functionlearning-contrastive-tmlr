@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import multivariate_normal
 from scipy.spatial.distance import squareform,pdist,cdist
-
+import pyGPs
 
 #a fixed ordering of the kernel names
 KERNELNAMES=['linear','rbf','periodic',
@@ -11,6 +11,92 @@ KERNELNAMES=['linear','rbf','periodic',
              'linear*rbf*periodic','mix']
 #the depth of each kernel, defined as the number of atomic pieces
 KERNELDEPTHS=[1]*3+[2]*6+[3]*4+[-1]
+
+class Linear2(pyGPs.Core.cov.Kernel):
+    '''
+    Linear kernel. hyp = [ theta ].
+    '''
+    def __init__(self, theta=0.):
+        self.hyp = [ theta ]
+
+    def getCovMatrix(self,x=None,z=None,mode=None):
+        self.checkInputGetCovMatrix(x,z,mode)
+        t=self.hyp[0]
+        if mode == 'self_test':           # self covariances for the test cases
+            nn,D = z.shape
+            A = np.reshape(np.sum((z-t)*(z-t),1), (nn,1))
+        elif mode == 'train':             # compute covariance matix for dataset x
+            n,D = x.shape
+            A = np.dot(x-t,(x-t).T) + np.eye(n)*1e-10    # required for numerical accuracy
+        elif mode == 'cross':             # compute covariance between data sets x and z
+            A = np.dot(x-t,(z-t).T)
+        return A
+
+    def getDerMatrix(self,x=None,z=None,mode=None,der=None):
+        #(xi-t)(xj-t); t^2-t(xi+xj)
+        self.checkInputGetDerMatrix(x,z,mode,der)
+        t=self.hyp[0]
+        if der == 0:
+            if mode == 'self_test':           # self covariances for the test cases
+                nn,D = z.shape
+                A=z+z.T #A_{ij}=z_i+z_j (broadcasting)
+            elif mode == 'train':             # compute covariance matix for dataset x
+                n,D = x.shape
+                A=x+x.T + np.eye(n)*1e-16    # required for numerical accuracy
+            elif mode == 'cross':             # compute covariance between data sets x and z
+                A = x+z.T
+            A = t*t-A
+        else:
+            raise Exception("Wrong derivative index in covLinear")
+        return A
+
+def get_cov_pygp(k_id):
+    #returns pygp class of the given kernel type; used to optimize the hyperparameters
+    #can pass either id or one of the strings in KERNELNAMES
+
+    #initialize hyperparameters from same distribution-helps with optimization
+
+
+    l=Linear2(theta=np.random.randn()*2)
+    r=pyGPs.cov.RBF(log_ell=np.log(np.random.uniform(1,5)),log_sigma=.5*np.log(np.random.uniform(1,3)))
+    #1/p=2theta5; logp=-log(2theta5)
+    #2/theta6^2=1/l^2; log(l)=-.5*log (2/theta6^2)
+    p=pyGPs.cov.Periodic(log_p=-np.log(np.random.rand()),log_ell=-.5*np.log(2/np.random.uniform(1,5)**2),log_sigma=.5*np.log(np.random.uniform(1,3)))
+    if k_id==0:
+        k = l
+    elif k_id==1:
+        k=r
+    elif k_id==2:
+        k=p
+    elif k_id==3: #l+p
+        k=l+p
+    elif k_id==4: #l+r
+        k=l+r
+    elif k_id==5: #r+p
+       k=r+p
+    elif k_id==6: #l*p
+        k=l*p
+    elif k_id==7: #l*r
+        k=l*r
+    elif k_id==8: #p*r
+        k=p*r
+    elif k_id==9: #l+r+p
+        k=l+r+p
+    elif k_id==10: #p*r+l
+        k=p*r+l
+    elif k_id==11:#l*r+p
+        k=l*r+p
+    elif k_id==12: #l*r*p
+        k=l*r*p
+    elif k_id==13:
+        w=np.random.rand(6)
+        m=np.random.rand(6)*.01
+        v=np.random.rand(6)*.02
+        hyp=np.concatenate((np.log(w),np.log(m),.5*np.log(v)))
+        k=pyGPs.cov.SM(Q=6,hyps=list(hyp))
+
+    return k+pyGPs.cov.Noise(log_sigma=-4*np.log(10)) #add noise term for numerical stability
+
 
 def spectral_ent(C):
     evals=np.linalg.svd(C)[1]

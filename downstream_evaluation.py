@@ -17,7 +17,8 @@ xs=np.linspace(0,10,100)
 
 
 #load in the saved models
-models_dir='saved_models'
+save_res=True
+models_dir='augmentation_ablations' #saved_modles
 models=[]
 auto_regs=[] #only used for cpc
 model_hparams=[]
@@ -28,7 +29,7 @@ for folder_name in os.listdir(models_dir):
             hparams=json.load(open(f'{dd}/hparams.json','r'))
         except:
             continue
-        if hparams['model_name']=='contrastive':
+        if hparams['model_name']=='contrastive' or hparams['model_name'].startswith('contrastive_ablation'):
             model=ConvEncoder(convolutional=True,h_size=hparams['h_size']).to(device)
         elif hparams['model_name']=='contrastive-fc-encoder':
             model=ConvEncoder(convolutional=False,h_size=hparams['h_size']).to(device)
@@ -102,12 +103,15 @@ train_sample_range=[3,10,30,100,300]#different numbers of samples used for train
 mc_res=[]
 cl_res=[]
 #number of kernel hparams to average over
-n_kernel_hparams=10
-
+n_kernel_hparams=10#3
+optimize_hyps=False#True
+if optimize_hyps:
+    print(f'optimizing hparams for mc')
+print(f'kernel samples={n_kernel_hparams}')
 for task_id in range(n_kernel_hparams):
     ns=n_eval_samples+max(train_sample_range)
-    y0s,ys,labs,y0s_obs,ys_inp,ys_mix,ys_comp,ys_rbf,ys_true_ker,ys_rsc=generate_curves(kernel_samples=ns,n_obs=n_obs)
-    #y0s: raw curves 
+    y0s,ys,labs,y0s_obs,ys_inp,ys_mix,ys_comp,ys_rbf,ys_true_ker,ys_rsc=generate_curves(kernel_samples=ns,n_obs=n_obs,optimize_hyps=optimize_hyps)
+    #y0s: raw curves
     #ys: curves projected to [0,1] (only used for kernel classification)
     #labs: ground truth kernel class of each curves
     #y0s_obs: the first e.g. 80 points of each curve (NOT in [0,1])
@@ -197,11 +201,15 @@ mc_res=pd.DataFrame(mc_res,columns=['pr correct','model name','kernel','task id'
 
 print('categorization results:')
 latex_table(cl_res,'score',ci='sem',sigfigs=2,mult_100=True)
+if save_res:
+    cl_res.to_csv(f'{models_dir}_cl_res.csv')
 
 rr=mc_res.groupby(['model name','run id','task id','train size']).mean().reset_index()
 print('mc results:')
 latex_table(rr,'pr correct',mult_100=True,ci='sem')
-
+if save_res:
+    rr.to_csv(f'{models_dir}_mc_res.csv')
+    mc_res.to_csv(f'{models_dir}_mc_res_full.csv')
 
 #show bias towards compositional vs mixture complextions
 qq=mc_res.groupby(['ktype','model name','run id','task id','train size']).mean().reset_index()
@@ -210,6 +218,8 @@ qq=qq.reset_index()
 qq['comp minus mix']=qq['comp']-qq['mix']
 print('difference in accs on mc:')
 latex_table(qq,'comp minus mix',mult_100=True,ci='sem')
+if save_res:
+    qq.to_csv(f'{models_dir}_mc_diff.csv')
 
 #evaluation on the freeform task
 n_train_samples=300 #samples for training logistic regressor
@@ -305,6 +315,8 @@ latex_table(bb,'corr',sigfigs=2,ci='sem',mult_100=True)
 print('freeform results, mse:')
 latex_table(bb,'dist',sigfigs=4,ci='sem',mult_100=False)
 
+if save_res:
+    bb.to_csv(f'{models_dir}_freeform_res.csv')
 
 
 
